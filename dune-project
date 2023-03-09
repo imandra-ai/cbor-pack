@@ -1,5 +1,6 @@
 (lang dune 2.8)
 (name cbor-pack)
+(using mdx 0.1)
 (generate_opam_files true)
 (source
  (github imandra-ai/cbor-pack))
@@ -19,7 +20,7 @@
 (package
  (name cbor-pack-ppx)
  (synopsis "Ppx deriver for cbor-pack")
- (depends (ocaml (>= 4.08)) cbor ppxlib (ppx_deriving :with-test))
+ (depends (ocaml (>= 4.08)) cbor ppxlib (ppx_deriving :with-test) (mdx :with-test))
  (tags
   (cbor ocaml ppx)))
 
