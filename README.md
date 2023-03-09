@@ -81,8 +81,9 @@ val my_foo : foo = {a = 1; b = 2.}
 # let c = Cbor_pack.to_cbor foo_to_cbpack my_foo;;
 val c : Cbor_pack.cbor = {h=[0: {0: 1, 1: 2.}; ]; k=6(0)}
 
-# CBOR.Simple.to_diagnostic c;;
-- : string = "{\"k\": 6(0), \"h\": [{0: 1, 1: 2.}]}"
+# CBOR.Simple.to_diagnostic c |> print_endline;;
+{"k": 6(0), "h": [{0: 1, 1: 2.}]}
+- : unit = ()
 
 # let s = Cbor_pack.to_string foo_to_cbpack my_foo;;
 ...
