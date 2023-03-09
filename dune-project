@@ -19,7 +19,7 @@
 (package
  (name cbor-pack-ppx)
  (synopsis "Ppx deriver for cbor-pack")
- (depends (ocaml (>= 4.08)) cbor ppxlib)
+ (depends (ocaml (>= 4.08)) cbor ppxlib (ppx_deriving :with-test))
  (tags
   (cbor ocaml ppx)))
 

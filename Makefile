@@ -13,7 +13,10 @@ doc:
 format:
 	dune build @fmt
 
-WATCH?=@check
+test:
+	dune runtest
+
+WATCH?=@src/check @runtest
 
 watch:
 	dune build $(WATCH) -w

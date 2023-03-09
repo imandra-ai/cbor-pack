@@ -86,7 +86,7 @@ module Vec = struct
     self.a.(i)
 
   let grow self =
-    let new_cap = min Sys.max_array_length (2 * cap self) in
+    let new_cap = max 4 (min Sys.max_array_length (2 * cap self)) in
     if new_cap = cap self then failwith "Vec cannot grow";
     let a' = Array.make new_cap `Null in
     Array.blit self.a 0 a' 0 self.sz;
