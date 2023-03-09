@@ -60,7 +60,7 @@ val foo_to_cbpack : foo Cbor_pack.Ser.t
 val foo_of_cbpack : foo Cbor_pack.Deser.t
 ```
 
-### Example
+### Example: a record
 
 For example, in `tests/t1.ml`, we can serialize and deserialize:
 
@@ -108,6 +108,85 @@ Hashconsing is sharing done on the heap itself. If the same CBOR value `c` is ad
 This has a cost at runtime (hashtable lookups), but can result in a significantly smaller pack at the end.
 
 The ppx will automatically enable hashconsing on records and sum types, unless `[@@nohashcons]` is specified.
+
+### Example: a tree
+
+```ocaml
+type tree =
+  | Nil
+  | Node of int * tree * tree
+  [@@deriving cbpack] [@@hashcons];;
+```
+
+
+```ocaml
+# let t =
+    let t2 = Node (2, Nil, Nil) in
+    let t3 = Node (3, t2, t2) in
+    let t4 = Node (4, t3, t2) in
+    Node (1, t4, t4);;
+val t : tree =
+  Node (1,
+   Node (4, Node (3, Node (2, Nil, Nil), Node (2, Nil, Nil)),
+    Node (2, Nil, Nil)),
+   Node (4, Node (3, Node (2, Nil, Nil), Node (2, Nil, Nil)),
+    Node (2, Nil, Nil)))
+```
+
+Note that serializing this (quite redundant) tree into CBOR would produce
+a similarly-shaped tree. Here, instead, we obtain this:
+
+```ocaml
+# Cbor_pack.to_cbor tree_to_cbpack t;;
+- : Cbor_pack.cbor =
+{h=[0: [1, 2, 0, 0];
+    1: [1, 3, 6(0), 6(0)];
+    2: [1, 4, 6(1), 6(0)];
+    3: [1, 1, 6(2), 6(2)];
+    ];
+ k=6(3)}
+
+# String.length (Cbor_pack.to_string tree_to_cbpack t);;
+- : int = 34
+```
+
+Without hashconsing we'd have:
+
+```ocaml
+type tree =
+  | Nil
+  | Node of int * tree * tree
+  [@@deriving cbpack] [@@nohashcons];;
+
+let t =
+    let t2 = Node (2, Nil, Nil) in
+    let t3 = Node (3, t2, t2) in
+    let t4 = Node (4, t3, t2) in
+    Node (1, t4, t4);;
+```
+
+```ocaml
+# Cbor_pack.to_cbor tree_to_cbpack t;;
+- : Cbor_pack.cbor =
+{h=[0: [1, 2, 0, 0];
+    1: [1, 2, 0, 0];
+    2: [1, 2, 0, 0];
+    3: [1, 3, 6(2), 6(1)];
+    4: [1, 4, 6(3), 6(0)];
+    5: [1, 2, 0, 0];
+    6: [1, 2, 0, 0];
+    7: [1, 2, 0, 0];
+    8: [1, 3, 6(7), 6(6)];
+    9: [1, 4, 6(8), 6(5)];
+    10: [1, 1, 6(9), 6(4)];
+    ];
+ k=6(10)}
+
+# String.length (Cbor_pack.to_string tree_to_cbpack t);;
+- : int = 73
+```
+
+which is more than twice as long.
 
 ### Attributes supported
 
