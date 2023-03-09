@@ -1,5 +1,7 @@
 # Cbor-pack
 
+[![build](https://github.com/imandra-ai/cbor-pack/actions/workflows/main.yml/badge.svg)](https://github.com/imandra-ai/cbor-pack/actions/workflows/main.yml)
+
 This is a serialization format that adds some structure on top of [CBOR](https://cbor.io).
 
 The additional layer is used to encode sharing in a reasonably efficient way, by
