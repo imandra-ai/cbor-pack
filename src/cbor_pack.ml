@@ -392,7 +392,7 @@ module Deser = struct
     | Error s -> invalid_arg s
 
   let pp_diagnostic out self =
-    Format.fprintf out "{@[<2>h=[@[<hv>";
+    Format.fprintf out "{@[<hv>h=[@[<hv>";
     Vec.iteri
       (fun i x ->
         let x =
@@ -401,15 +401,15 @@ module Deser = struct
             `Text
               (Printf.sprintf "%s… (%d more bytes)" (String.sub s 0 100)
                  (String.length s - 100))
-          | `Bytes s when String.length s > 100 ->
+          | `Bytes s when String.length s > 50 ->
             `Bytes
-              (Printf.sprintf "%s… (%d more bytes)" (String.sub s 0 100)
-                 (String.length s - 100))
+              (Printf.sprintf "%S… (%d more bytes)" (String.sub s 0 50)
+                 (String.length s - 50))
           | x -> x
         in
         Format.fprintf out "@[%d: %s@];@ " i (Cbor.to_diagnostic x))
       self.entries;
-    Format.fprintf out "@]]@,@]}"
+    Format.fprintf out "@]];@ k=%s@]}" (Cbor.to_diagnostic self.key)
 
   let show_diagnostic self =
     let buf = Buffer.create 32 in
