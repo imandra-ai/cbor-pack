@@ -8,11 +8,15 @@ val pp_diagnostic : Format.formatter -> cbor -> unit
 (** Serialization *)
 module Ser : sig
   type state
+  (** State used for serialization.
+
+      It contains an in-progress heap, and a hash table for hashconsing. *)
 
   type 'a t = state -> 'a -> cbor
   (** Serializer for type ['a] *)
 
   val create : unit -> state
+  (** New state. *)
 
   type ptr = cbor
   (** An integer + tag for CBOR *)
@@ -26,22 +30,21 @@ module Ser : sig
   val list : cbor list -> cbor
   val list_of : ('a -> cbor) -> 'a list -> cbor
   val map : (cbor * cbor) list -> cbor
-
-  (* TODO: keep this?
-     val with_cycle_detection : state -> 'a -> ('a -> ptr) -> ptr
-  *)
-
   val add_entry : ?hashcons:bool -> state -> cbor -> ptr
 
-  val add_string : state -> string -> cbor
-  (** Depending on the size of the string, uses {!add_entry} or returns it
-      directly using {!string} *)
+  val add_string : ?hashcons:bool -> state -> string -> cbor
+  (** Same as [add_entry state (`Text s)], except that large strings
+      will be hashconsed unconditionally. *)
 
-  val add_bytes : state -> bytes -> cbor
+  val add_bytes : ?hashcons:bool -> state -> bytes -> cbor
   (** Same as {!add_string} *)
 
   val finalize_cbor : state -> key:cbor -> cbor
+  (** Turn the state into a pack with given [key] as entrypoint. *)
+
   val finalize_string : state -> key:cbor -> string
+  (** Same as {!finalize_cbor} but also turns the resulting packed CBOR
+      into a string. *)
 end
 
 val to_string : 'a Ser.t -> 'a -> string
@@ -54,9 +57,13 @@ val to_cbor : 'a Ser.t -> 'a -> cbor
 (** Deserialization *)
 module Deser : sig
   type state
+  (** Deserialization state, containing the heap of CBOR
+      values. *)
+
   type 'a or_error = ('a, string) result
 
   exception Error of string
+  (** Exception raised by most of the [to_xxx] functions below. *)
 
   type ptr
 
@@ -65,7 +72,8 @@ module Deser : sig
       @raise Error in case of error *)
 
   val deref : state -> ptr -> cbor
-  (** Get an item via its pointer *)
+  (** Get an item via its pointer.
+      @raise Invalid_argument if the pointer is invalid. *)
 
   val to_unit : state -> cbor -> unit
   val to_int : state -> cbor -> int
@@ -77,8 +85,11 @@ module Deser : sig
   val to_ptr : cbor -> ptr
   val map_entry : k:cbor -> state -> cbor -> cbor
 
+  val to_any_tag : state -> cbor -> int * cbor
+  (** Deserialize an arbitrary tag *)
+
   val to_tag : int -> state -> cbor -> cbor
-  (** Tag *)
+  (** Expect a particular tag. *)
 
   val to_text : state -> cbor -> string
   val to_bytes : state -> cbor -> bytes

@@ -193,10 +193,11 @@ module Ser = struct
   let string x : cbor = `Text x
   let bytes x : cbor = `Bytes (Bytes.unsafe_to_string x)
 
-  let add_entry ?(hashcons = true) (self : state) (c : cbor) : ptr =
+  let add_entry ?(hashcons = false) (self : state) (c : cbor) : ptr =
     match c with
     | `Tag (t, `Int _) when t == tag_ptr -> c (* do not add pointers *)
-    | `Int _ | `Bool _ | `Null -> c (* do not add small scalars *)
+    | `Int _ | `Bool _ | `Null | `Undefined | `Float _ ->
+      c (* do not add scalars *)
     | _ ->
       (try Cbor_table.find self.hashcons c
        with Not_found ->
@@ -209,17 +210,17 @@ module Ser = struct
   (* strings bigger than that will get their own entry *)
   let _hashcons_limit_str = 20
 
-  let add_string self s : cbor =
+  let add_string ?(hashcons = false) self s : cbor =
     let c = string s in
-    if String.length s >= _hashcons_limit_str then
-      add_entry self c
+    if hashcons || String.length s >= _hashcons_limit_str then
+      add_entry ~hashcons:true self c
     else
       c
 
-  let add_bytes self b : cbor =
+  let add_bytes ?(hashcons = false) self b : cbor =
     let c = bytes b in
-    if Bytes.length b >= _hashcons_limit_str then
-      add_entry self c
+    if hashcons || Bytes.length b >= _hashcons_limit_str then
+      add_entry ~hashcons:true self c
     else
       c
 
@@ -253,6 +254,7 @@ module Deser = struct
   exception Error = CBOR.Error
 
   let error_ s = raise (Error s)
+  let errorf_ s = Printf.ksprintf error_ s
 
   type ptr = int
 
@@ -318,10 +320,15 @@ module Deser = struct
     | `Bytes x -> Bytes.unsafe_of_string x
     | _ -> error_ "expected bytes"
 
+  let to_any_tag state c =
+    match deref_if_ptr state c with
+    | `Tag (j, sub) -> j, sub
+    | _ -> error_ "expected (any) tag"
+
   let to_tag_ i = function
     | `Tag (j, sub) when i = j -> sub
     | `Tag _ -> error_ "wrong tag"
-    | _ -> error_ "expected tag"
+    | _ -> errorf_ "expected tag %d" i
 
   let to_tag i state c = to_tag_ i @@ deref_if_ptr state c
   let to_ptr x : ptr = to_int_ @@ to_tag_ tag_ptr x

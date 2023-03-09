@@ -79,7 +79,7 @@ Then we can encode a value:
 # let my_foo = { a = 1; b = 2.0 };;
 val my_foo : foo = {a = 1; b = 2.}
 # let c = Cbor_pack.to_cbor foo_to_cbpack my_foo;;
-val c : Cbor_pack.cbor = {h=[0: {0: 1, 1: 2.}; ]}
+val c : Cbor_pack.cbor = {h=[0: {0: 1, 1: 2.}; ]; k=6(0)}
 
 # CBOR.Simple.to_diagnostic c;;
 - : string = "{\"k\": 6(0), \"h\": [{0: 1, 1: 2.}]}"
@@ -105,6 +105,8 @@ Hashconsing is sharing done on the heap itself. If the same CBOR value `c` is ad
   pointer to the first entry.
 
 This has a cost at runtime (hashtable lookups), but can result in a significantly smaller pack at the end.
+
+The ppx will automatically enable hashconsing on records and sum types, unless `[@@nohashcons]` is specified.
 
 ### Attributes supported
 
