@@ -1,0 +1,8 @@
+(library
+ (name cbor_pack_ppx)
+ (public_name cbor-pack-ppx)
+ (kind ppx_deriver)
+ (ppx_runtime_libraries cbor-pack)
+ (libraries ppxlib ppxlib.astlib)
+ (preprocess
+  (pps ppxlib.metaquot)))

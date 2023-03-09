@@ -1,0 +1,5 @@
+(library
+ (name cbor_pack)
+ (synopsis "Serialization format with sharing on top of CBOR")
+ (public_name cbor-pack)
+ (libraries cbor))
