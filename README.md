@@ -120,3 +120,7 @@ The ppx will automatically enable hashconsing on records and sum types, unless `
 - `[@@hashcons]` on type decl: enable hashconsing for this type.
 - `[@@nohashcons]` on type decl: disable hashconsing for this type.
 - `[@@use_field_names]` on type decl: use strings for record fields, not ints
+
+## License
+
+MIT
