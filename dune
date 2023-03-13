@@ -1,2 +1,2 @@
 
-(mdx)
+(mdx (package cbor-pack-ppx))

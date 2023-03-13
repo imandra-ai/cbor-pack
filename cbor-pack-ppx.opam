@@ -8,13 +8,13 @@ tags: ["cbor" "ocaml" "ppx"]
 homepage: "https://github.com/imandra-ai/cbor-pack"
 bug-reports: "https://github.com/imandra-ai/cbor-pack/issues"
 depends: [
-  "dune" {>= "2.8"}
+  "dune" {>= "2.9"}
   "ocaml" {>= "4.08"}
   "cbor"
   "cbor-pack" {= version}
-  "ppxlib"
+  "ppxlib" {>= "0.29.0"}
   "ppx_deriving" {with-test}
-  "mdx" {with-test}
+  "mdx" {with-test & >= "1.9"}
   "odoc" {with-doc}
 ]
 build: [
@@ -26,9 +26,11 @@ build: [
     name
     "-j"
     jobs
+    "--promote-install-files=false"
     "@install"
     "@runtest" {with-test}
     "@doc" {with-doc}
   ]
+  ["dune" "install" "-p" name "--create-install-files" name]
 ]
 dev-repo: "git+https://github.com/imandra-ai/cbor-pack.git"

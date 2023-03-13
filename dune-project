@@ -1,4 +1,4 @@
-(lang dune 2.8)
+(lang dune 2.9)
 (name cbor-pack)
 (using mdx 0.1)
 (generate_opam_files true)
@@ -13,7 +13,7 @@
 (package
  (name cbor-pack)
  (synopsis "Library for CBOR-pack: a sharing aware serialization on top of CBOR")
- (depends (ocaml (>= 4.08)) cbor)
+ (depends (ocaml (>= 4.08)) (cbor (>= 0.5)))
  (tags
   (cbor ocaml)))
 
@@ -21,7 +21,9 @@
  (name cbor-pack-ppx)
  (synopsis "Ppx deriver for cbor-pack")
  (depends (ocaml (>= 4.08)) cbor (cbor-pack (= :version))
-          ppxlib (ppx_deriving :with-test) (mdx :with-test))
+          (ppxlib (>= 0.29.0))
+          (ppx_deriving :with-test)
+          (mdx (and :with-test (>= 1.9))))
  (tags
   (cbor ocaml ppx)))
 
