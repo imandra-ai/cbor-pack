@@ -1,5 +1,6 @@
 (lang dune 2.9)
 (name cbor-pack)
+(version 0.1)
 (using mdx 0.1)
 (generate_opam_files true)
 (source
