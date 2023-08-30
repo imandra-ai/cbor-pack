@@ -14,8 +14,8 @@ jobs:
             #- windows-latest   # see  https://github.com/ocaml/setup-ocaml/issues/361
             #- macos-latest  # clogs CI
         ocaml-compiler:
-          - 4.08.x
-          - 5.0.x
+          - '4.08.0'
+          - '5.0.0'
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v2
@@ -27,4 +27,4 @@ jobs:
     - run: opam install -t . --deps-only
     - run: opam exec -- dune build --ignore-promoted-rules
     - run: opam exec -- dune runtest --ignore-promoted-rules
-      if: ${{ matrix.os == 'ubuntu-latest' && matrix.ocaml-compiler == '4.14.x' }}
+      if: ${{ matrix.os == 'ubuntu-latest' && matrix.ocaml-compiler == '5.0.0' }}
