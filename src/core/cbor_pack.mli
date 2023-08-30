@@ -110,13 +110,13 @@ module Deser : sig
   val failf : ('a, unit, string, 'b) format4 -> 'a
   (** Fail to decode with a formatted message. *)
 
-  val to_unit : state -> cbor -> unit
-  val to_int : state -> cbor -> int
-  val to_bool : state -> cbor -> bool
-  val to_float : state -> cbor -> float
-  val to_list : state -> cbor -> cbor list
-  val to_list_of : (state -> cbor -> 'a) -> state -> cbor -> 'a list
-  val to_map : state -> cbor -> (cbor * cbor) list
+  val to_unit : unit t
+  val to_int : int t
+  val to_bool : bool t
+  val to_float : float t
+  val to_list : cbor list t
+  val to_list_of : 'a t -> 'a list t
+  val to_map : (cbor * cbor) list t
   val to_ptr : cbor -> ptr
   val map_entry : k:cbor -> state -> cbor -> cbor
 
@@ -126,8 +126,8 @@ module Deser : sig
   val to_tag : int -> state -> cbor -> cbor
   (** Expect a particular tag. *)
 
-  val to_text : state -> cbor -> string
-  val to_bytes : state -> cbor -> bytes
+  val to_text : string t
+  val to_bytes : bytes t
 
   val deref_if_ptr : state -> cbor -> cbor
   (** If the CBOR is a pointer, dereference it (recursively) *)
