@@ -47,30 +47,28 @@ and in the code:
 
 ```ocaml
 # type foo = {
-  x: int;
-  y: (string [@as_bytes]);
-Line 4, characters 1-3:
-Error: Syntax error
+    x: int;
+    y: (string [@as_bytes]);
+  } [@@deriving cbpack];;
+type foo = { x : int; y : string; }
+val foo_to_cbpack : Cbor_pack.Ser.state -> foo -> Cbor_pack.cbor = <fun>
+val foo_of_cbpack : Cbor_pack.Deser.state -> Cbor_pack.cbor -> foo = <fun>
 ```
 
-which creates two functions:
-
-<!-- $MDX skip -->
-```ocaml
-val foo_to_cbpack : foo Cbor_pack.Ser.t
-val foo_of_cbpack : foo Cbor_pack.Deser.t
-```
+which creates two functions for serializing and deserializing.
 
 ### Example: a record
 
 For example, in `tests/t1.ml`, we can serialize and deserialize:
 
 ```ocaml
-type foo = {
-  a: int;
-  b: float;
-}
-[@@deriving cbpack]
+# type foo = {
+    a: int;
+    b: float;
+  } [@@deriving cbpack] ;;
+type foo = { a : int; b : float; }
+val foo_to_cbpack : Cbor_pack.Ser.state -> foo -> Cbor_pack.cbor = <fun>
+val foo_of_cbpack : Cbor_pack.Deser.state -> Cbor_pack.cbor -> foo = <fun>
 ```
 
 Then we can encode a value:
@@ -90,6 +88,8 @@ val c : Cbor_pack.cbor =
 
 # let s = Cbor_pack.to_string foo_to_cbpack my_foo;;
 ...
+# String.length s;;
+- : int = 21
 ```
 
 and deserialize it again:
@@ -104,11 +104,78 @@ val foo2 : foo = {a = 1; b = 2.}
 
 ### Hashconsing
 
-Hashconsing is sharing done on the heap itself. If the same CBOR value `c` is added twice to the heap
-with the hashconsing option enabled, the second occurrence will not be added but will reuse a
-pointer to the first entry.
+Hashconsing is sharing done on the heap itself. If the same CBOR value `c` is
+added twice to the heap with the hashconsing option enabled, the second
+occurrence will not be added but will reuse a pointer to the first entry.
 
-This has a cost at runtime (hashtable lookups), but can result in a significantly smaller pack at the end.
+This has a cost at runtime (hashtable lookups), but can result in a
+significantly smaller pack at the end. Hashconsing is generic and can work on
+any type because it proceeds entirely on serialized values.
+
+### Caching during serialization
+
+The serializer can cache previously encoded values for types that are comparable and hashable:
+
+```ocaml
+type foo = {
+  x: int;
+  y: bool
+} [@@deriving cbpack]
+
+(* used inside the cache *)
+module Foo = struct
+  type t = foo
+  let equal a b = a.x=b.x && a.y=b.y
+  let hash = Hashtbl.hash
+end
+
+let key_cache_ser_foo = Cbor_pack.Ser.create_cache_key (module Foo) ;;
+
+let foo_to_cbpack_cached: foo Cbor_pack.Ser.t =
+    Cbor_pack.Ser.with_cache key_cache_ser_foo foo_to_cbpack;;
+```
+
+(Note how `foo_to_cbpack_cached` needs both a key, and the uncached serializer which is used
+for values that aren't already in the cache).
+
+Now we can encode values and introduce sharing in a way that is more efficient at runtime
+that using hashconsing (values already encoded are not re-encoded at all).
+
+```ocaml
+# let l =
+    let f1: foo = {x=1; y=true} in
+    let f2: foo = {x=2; y=false} in
+    [f1; f2; f1; f2; f1; f2; f2; f1];;
+val l : foo list =
+  [{x = 1; y = true}; {x = 2; y = false}; {x = 1; y = true};
+   {x = 2; y = false}; {x = 1; y = true}; {x = 2; y = false};
+   {x = 2; y = false}; {x = 1; y = true}]
+
+
+# Cbor_pack.to_cbor Cbor_pack.Ser.(list_of foo_to_cbpack_cached) l;;
+- : Cbor_pack.cbor =
+`Map
+  [(`Text "k",
+    `Array
+      [`Tag (6, `Int 0); `Tag (6, `Int 1); `Tag (6, `Int 0);
+       `Tag (6, `Int 1); `Tag (6, `Int 0); `Tag (6, `Int 1);
+       `Tag (6, `Int 1); `Tag (6, `Int 0)]);
+   (`Text "h",
+    `Array
+      [`Map [(`Int 0, `Int 1); (`Int 1, `Bool true)];
+       `Map [(`Int 0, `Int 2); (`Int 1, `Bool false)]])]
+
+# Cbor_pack.to_string Cbor_pack.Ser.(list_of foo_to_cbpack_cached) l |> String.length;;
+- : int = 33
+```
+
+Note that without caching we get a bigger value:
+
+```ocaml
+
+# Cbor_pack.to_string Cbor_pack.Ser.(list_of foo_to_cbpack) l |> String.length;;
+- : int = 63
+```
 
 ### Example: a tree
 
