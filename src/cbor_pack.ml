@@ -158,13 +158,6 @@ module Cbor_table = Hashtbl.Make (struct
 end)
 
 module Ser = struct
-  module Obj_table = Hashtbl.Make (struct
-    type t = Obj.t
-
-    let equal = ( == )
-    let hash = Hashtbl.hash
-  end)
-
   type ptr = cbor
 
   type state = {
