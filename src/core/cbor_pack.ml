@@ -155,7 +155,6 @@ let to_string ser x =
 
 module Deser = struct
   type state = {
-    c: cbor;
     entries: Vec.t;  (** heap *)
     key: cbor;  (** entrypoint *)
   }
@@ -216,11 +215,11 @@ module Deser = struct
     | `Array x -> List.map (f state) x
     | _ -> error_ "expected array"
 
-  let to_map_ = function
+  let to_map_no_deref_ = function
     | `Map l -> l
     | _ -> error_ "expected map"
 
-  let to_map state c = to_map_ @@ deref_if_ptr state c
+  let to_map state c = to_map_no_deref_ @@ deref_if_ptr state c
 
   let to_text state c =
     match deref_if_ptr state c with
@@ -243,15 +242,15 @@ module Deser = struct
     | _ -> errorf_ "expected tag %d" i
 
   let to_tag i state c = to_tag_ i @@ deref_if_ptr state c
-  let to_ptr x : ptr = to_int_ @@ to_tag_ tag_ptr x
-  let ( let+ ) self f state c = f (self state c)
+  let[@inline] to_ptr x : ptr = to_int_ @@ to_tag_ tag_ptr x
+  let[@inline] ( let+ ) self f state c = f (self state c)
 
-  let ( let* ) self (f : _ -> _ t) state c =
+  let[@inline] ( let* ) self (f : _ -> _ t) state c =
     let x = self state c in
     f x state c
 
-  let map_entry_ ~k (c : cbor) : cbor =
-    let m = to_map_ c in
+  let map_entry_no_deref_ ~k (c : cbor) : cbor =
+    let m = to_map_no_deref_ c in
     try List.assoc k m with Not_found -> error_ "cannot find key in map"
 
   let map_entry ~k state (c : cbor) : cbor =
@@ -261,10 +260,12 @@ module Deser = struct
   let entry_key self = self.key
 
   let of_cbor_ c : state =
-    (* see: Ser.finalize *)
-    let key = map_entry_ ~k:(`Text "k") c in
-    let entries = map_entry_ ~k:(`Text "h") c |> to_list_ |> Vec.of_list in
-    { c; entries; key }
+    (* NOTE: keep in touch with [Ser.finalize] *)
+    let key = map_entry_no_deref_ ~k:(`Text "k") c in
+    let entries =
+      map_entry_no_deref_ ~k:(`Text "h") c |> to_list_ |> Vec.of_list
+    in
+    { entries; key }
 
   let parse s : state or_error =
     try

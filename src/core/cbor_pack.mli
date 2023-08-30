@@ -116,7 +116,11 @@ module Deser : sig
   (** Entry point *)
 
   val ( let+ ) : 'a t -> ('a -> 'b) -> 'b t
+  (** Map combinator *)
+
   val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
+  (** Bind combinator *)
+
   val parse : string -> state or_error
 
   val parse_exn : string -> state
