@@ -195,8 +195,8 @@ module Ser = struct
          if hashcons then Cbor_table.add self.hashcons c ptr;
          ptr)
 
-  (* strings bigger than that will get their own entry *)
-  let _hashcons_limit_str = 20
+  (** strings bigger than that will get their own entry *)
+  let _hashcons_limit_str = 32
 
   let add_string ?(hashcons = false) self s : cbor =
     let c = string s in

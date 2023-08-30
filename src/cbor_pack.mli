@@ -30,7 +30,13 @@ module Ser : sig
   val list : cbor list -> cbor
   val list_of : ('a -> cbor) -> 'a list -> cbor
   val map : (cbor * cbor) list -> cbor
+
   val add_entry : ?hashcons:bool -> state -> cbor -> ptr
+  (** [add_entry st c] turns [c] as a heap entry and returns
+      a pointer to it.
+      @param hashcons if true, [c] is first compared to existing
+      hashconsed entries (at a runtime cost) to see if we can reuse
+      them instead of inserting a new value. *)
 
   val add_string : ?hashcons:bool -> state -> string -> cbor
   (** Same as [add_entry state (`Text s)], except that large strings
