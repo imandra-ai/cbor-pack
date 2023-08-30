@@ -177,6 +177,47 @@ Note that without caching we get a bigger value:
 - : int = 63
 ```
 
+### Caching during deserialization
+
+Similarly, during deserialization, some values might be referenced many times
+using _pointers_ into the cbor-pack heap. Ideally we want to decode
+each value only once, and cache the decoded value.
+
+To do that there is `Cbor_pack.Deser.create_cache_key`. Let's reuse the example from serialization caching:
+
+```ocaml
+type nonrec foo = foo = {
+  x: int;
+  y: bool
+}
+
+let key_foo_deser: foo Cbor_pack.Deser.cache_key = Cbor_pack.Deser.create_cache_key()
+
+(* cached deserializer *)
+let foo_of_cbpack_cached = Cbor_pack.Deser.with_cache key_foo_deser foo_of_cbpack;;
+```
+
+```ocaml
+# let encoded_foo_list = Cbor_pack.to_cbor Cbor_pack.Ser.(list_of foo_to_cbpack_cached) l;;
+val encoded_foo_list : Cbor_pack.cbor =
+  `Map
+    [(`Text "k",
+      `Array
+        [`Tag (6, `Int 0); `Tag (6, `Int 1); `Tag (6, `Int 0);
+         `Tag (6, `Int 1); `Tag (6, `Int 0); `Tag (6, `Int 1);
+         `Tag (6, `Int 1); `Tag (6, `Int 0)]);
+     (`Text "h",
+      `Array
+        [`Map [(`Int 0, `Int 1); (`Int 1, `Bool true)];
+         `Map [(`Int 0, `Int 2); (`Int 1, `Bool false)]])]
+
+# let l = Cbor_pack.of_cbor_exn Cbor_pack.Deser.(to_list_of foo_of_cbpack_cached) encoded_foo_list;;
+val l : foo list =
+  [{x = 1; y = true}; {x = 2; y = false}; {x = 1; y = true};
+   {x = 2; y = false}; {x = 1; y = true}; {x = 2; y = false};
+   {x = 2; y = false}; {x = 1; y = true}]
+```
+
 ### Example: a tree
 
 ```ocaml
