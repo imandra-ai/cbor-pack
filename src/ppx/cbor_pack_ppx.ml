@@ -101,18 +101,6 @@ let attr_hashcons =
     Ast_pattern.(pstr nil)
     ()
 
-(* on type: do not hashcons *)
-let attr_nohashcons =
-  Attribute.declare "cbpack.nohashcons" Attribute.Context.type_declaration
-    Ast_pattern.(pstr nil)
-    ()
-
-(* on type: possibly cyclic *)
-let attr_cyclic =
-  Attribute.declare "cbpack.cyclic" Attribute.Context.type_declaration
-    Ast_pattern.(pstr nil)
-    ()
-
 let attr_deser =
   Attribute.declare "cbpack.deser" Attribute.Context.core_type
     Ast_pattern.(single_expr_payload __)
@@ -389,33 +377,26 @@ let ser_expr_of_tydecl (decl : type_declaration) : expression =
   let loc = decl.ptype_loc in
   let self = A.Exp.ident @@ lid ~loc "self" in
 
-  let hashcons ~is_composite =
+  let hashcons =
     if is_some_ (Attribute.get ~mark_as_seen:true attr_hashcons decl) then
-      [%expr Some true]
-    else if is_some_ (Attribute.get ~mark_as_seen:true attr_nohashcons decl)
-    then
-      [%expr Some false]
-    else if is_composite then
-      [%expr Some true]
-    (* default for composites: true *)
+      [%expr true]
     else
-      [%expr None]
+      [%expr false]
   in
   let use_field_names =
     is_some_ (Attribute.get ~mark_as_seen:true attr_use_field_names decl)
   in
 
-  let body, is_composite =
+  let body =
     match decl.ptype_kind with
     | Ptype_abstract ->
       (match decl.ptype_manifest with
       | Some ty_alias ->
-        ser_expr_of_ty self ~ty:ty_alias, false (* alias, just forward to it *)
-      | None -> [%expr [%error "cannot derive cbpack for abstract type"]], false)
-    | Ptype_open -> [%expr [%error "cannot derive cbpack for open type"]], false
+        ser_expr_of_ty self ~ty:ty_alias (* alias, just forward to it *)
+      | None -> [%expr [%error "cannot derive cbpack for abstract type"]])
+    | Ptype_open -> [%expr [%error "cannot derive cbpack for open type"]]
     | Ptype_variant cstors ->
       (* is it an enum? (no payload in any cstor) *)
-      let is_pure_enum = ref true in
       let ser_cstor (i : int)
           ({ pcd_args; pcd_name = cname; pcd_loc = loc; _ } as cstor) : case =
         (* constructor identifier *)
@@ -427,12 +408,12 @@ let ser_expr_of_tydecl (decl : type_declaration) : expression =
             [%expr Cbor_pack.Ser.string [%e A.Exp.constant (A.Const.string s)]]
         in
 
-        let lhs, rhs, is_constant_cstor =
+        let lhs, rhs =
           match pcd_args with
           | Pcstr_tuple [] ->
             let lhs = A.Pat.construct (lid_of_str cname) None
             and rhs = cstor_key in
-            lhs, rhs, true
+            lhs, rhs
           | Pcstr_tuple [ ty0 ] ->
             let lhs =
               let x0 = A.Pat.var { loc; txt = "x" } in
@@ -444,7 +425,7 @@ let ser_expr_of_tydecl (decl : type_declaration) : expression =
                 Cbor_pack.Ser.list
                   [ [%e cstor_key]; [%e ser_expr_of_ty x0 ~ty:ty0] ]]
             in
-            lhs, rhs, false
+            lhs, rhs
           | Pcstr_tuple l ->
             let lhs =
               let pat =
@@ -468,7 +449,7 @@ let ser_expr_of_tydecl (decl : type_declaration) : expression =
               [%expr Cbor_pack.Ser.list ([%e cstor_key] :: [%e ser_fields])]
             in
 
-            lhs, rhs, false
+            lhs, rhs
           | Pcstr_record r ->
             (* variable for the record *)
             let pat_r = A.Pat.var { loc; txt = "r" } in
@@ -485,14 +466,13 @@ let ser_expr_of_tydecl (decl : type_declaration) : expression =
               in
               [%expr Cbor_pack.Ser.list ([%e cstor_key] :: [%e ser_fields])]
             in
-            lhs, rhs, false
+            lhs, rhs
         in
-        is_pure_enum := !is_pure_enum && is_constant_cstor;
 
         B.case ~lhs ~guard:None ~rhs
       in
       let branches = List.mapi ser_cstor cstors in
-      A.Exp.match_ self branches, not !is_pure_enum
+      A.Exp.match_ self branches
     | Ptype_record labels ->
       (* make a map *)
       let e =
@@ -514,13 +494,13 @@ let ser_expr_of_tydecl (decl : type_declaration) : expression =
                [%expr [%e key], [%e e]])
         |> mk_list ~loc
       in
-      [%expr Cbor_pack.Ser.map [%e e]], true
+      [%expr Cbor_pack.Ser.map [%e e]]
   in
 
   [%expr
     fun ser self ->
       let open Cbor_pack.Ser in
-      add_entry ?hashcons:[%e hashcons ~is_composite] ser @@ [%e body]]
+      add_entry ~hashcons:[%e hashcons] ser @@ [%e body]]
 
 let deser_expr_of_tydecl (decl : type_declaration) : expression =
   let loc = decl.ptype_loc in
@@ -679,12 +659,6 @@ let generate_impl_ (rec_flag, type_declarations) =
     mk_lambda ~loc (List.map name_poly_var_ @@ param_names ty) body
   in
 
-  let cyclic =
-    List.exists
-      (fun ty -> is_some_ (Attribute.get ~mark_as_seen:true attr_cyclic ty))
-      type_declarations
-  in
-
   (* generate serialization code *)
   let ser_decls =
     List.map
@@ -711,28 +685,7 @@ let generate_impl_ (rec_flag, type_declarations) =
 
   (* deserialization code might be lazy (cyclic values), so here we wrap
      taht in a forcing layer *)
-  let deser_defs_wrappers =
-    if cyclic then (
-      let decls =
-        List.map
-          (fun ty ->
-            let loc = ty.ptype_loc in
-            let fname = deser_name_of_ty ty in
-            let f = A.Exp.ident @@ lid_of_str { loc; txt = fname } in
-            let rhs =
-              [%expr
-                fun deser self ->
-                  let open Cbor_pack.Deser in
-                  with_perform_delayed deser @@ fun () -> [%e f] deser self]
-            in
-            let def = fun_poly_gen_ ~loc ty @@ rhs in
-            A.Vb.mk (A.Pat.var { loc; txt = fname }) def)
-          type_declarations
-      in
-      List.map (fun d -> A.Str.value Nonrecursive [ d ]) decls
-    ) else
-      []
-  in
+  let deser_defs_wrappers = [] in
 
   let bracket_warn stri =
     let loc =
