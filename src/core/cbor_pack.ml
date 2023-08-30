@@ -76,23 +76,34 @@ module Ser = struct
   type state = {
     entries: Vec.t;
     hashcons: ptr Cbor_table.t;
+    mutable hmap: Hmap.t;
   }
 
   type 'a t = state -> 'a -> cbor
 
   let create () : state =
-    { entries = Vec.create (); hashcons = Cbor_table.create 16 }
+    {
+      entries = Vec.create ();
+      hashcons = Cbor_table.create 16;
+      hmap = Hmap.empty;
+    }
 
-  let mk_ptr_ n = `Tag (tag_ptr, `Int n)
+  let[@inline] mk_ptr_ n = `Tag (tag_ptr, `Int n)
   let unit : cbor = `Null
-  let int x : cbor = `Int x
-  let bool x : cbor = `Bool x
-  let float x : cbor = `Float x
-  let list x : cbor = `Array x
-  let list_of f x = list (List.map f x)
-  let map x : cbor = `Map x
-  let string x : cbor = `Text x
-  let bytes x : cbor = `Bytes (Bytes.unsafe_to_string x)
+  let[@inline] int x : cbor = `Int x
+  let[@inline] bool x : cbor = `Bool x
+  let[@inline] float x : cbor = `Float x
+  let[@inline] list x : cbor = `Array x
+  let[@inline] list_of f x = list (List.map f x)
+  let[@inline] map x : cbor = `Map x
+  let[@inline] string x : cbor = `Text x
+  let[@inline] bytes x : cbor = `Bytes (Bytes.unsafe_to_string x)
+  let[@inline] hmap self = self.hmap
+
+  let update_hmap (self : state) f =
+    let new_hmap, x = f self.hmap in
+    self.hmap <- new_hmap;
+    x
 
   let add_entry ?(hashcons = false) (self : state) (c : cbor) : ptr =
     match c with

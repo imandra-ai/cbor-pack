@@ -18,6 +18,15 @@ module Ser : sig
   val create : unit -> state
   (** New state. *)
 
+  val hmap : state -> Hmap.t
+  (** Extensible hmap, to put encoder-specific state (e.g.
+      a hashtable to preserve sharing for a given type) *)
+
+  val update_hmap : state -> (Hmap.t -> Hmap.t * 'a) -> 'a
+  (** [update_hmap st f] calls [f cur_hmap] on the current hmap.
+      The call to [f] returns the new hmap, which is assigned in [st],
+      as well as a side value that is returned. *)
+
   type ptr = cbor
   (** An integer + tag for CBOR *)
 
