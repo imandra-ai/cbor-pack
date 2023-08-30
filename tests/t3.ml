@@ -5,7 +5,7 @@ module M1 = struct
     x: int; [@key "X"]
     y: bool; [@key "Y"]
   }
-  [@@deriving cbpack, show] [@@cbpack.nohashcons]
+  [@@deriving cbpack, show]
 
   type t1 = { foos: t0 list } [@@deriving cbpack, show]
 
@@ -33,7 +33,7 @@ module M2 = struct
     x: int; [@key "x0"]
     y: bool; [@key "y"]
   }
-  [@@deriving cbpack, show]
+  [@@deriving cbpack, show] [@@cbpack.hashcons]
 
   type t1 = { foos: t0 list } [@@deriving cbpack, show]
 

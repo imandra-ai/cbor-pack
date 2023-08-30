@@ -105,12 +105,10 @@ val foo2 : foo = {a = 1; b = 2.}
 ### Hashconsing
 
 Hashconsing is sharing done on the heap itself. If the same CBOR value `c` is added twice to the heap
-  with the hashconsing option enabled, the second occurrence will not be added but will reuse a
-  pointer to the first entry.
+with the hashconsing option enabled, the second occurrence will not be added but will reuse a
+pointer to the first entry.
 
 This has a cost at runtime (hashtable lookups), but can result in a significantly smaller pack at the end.
-
-The ppx will automatically enable hashconsing on records and sum types, unless `[@@nohashcons]` is specified.
 
 ### Example: a tree
 
@@ -158,12 +156,12 @@ a similarly-shaped tree. Here, instead, we obtain this:
 Without hashconsing we'd have:
 
 ```ocaml
-type tree =
+type tree2 =
   | Nil
-  | Node of int * tree * tree
-  [@@deriving cbpack] [@@nohashcons];;
+  | Node of int * tree2 * tree2
+  [@@deriving cbpack];;
 
-let t =
+let t: tree2 =
     let t2 = Node (2, Nil, Nil) in
     let t3 = Node (3, t2, t2) in
     let t4 = Node (4, t3, t2) in
@@ -171,7 +169,7 @@ let t =
 ```
 
 ```ocaml
-# Cbor_pack.to_cbor tree_to_cbpack t;;
+# Cbor_pack.to_cbor tree2_to_cbpack t;;
 - : Cbor_pack.cbor =
 `Map
   [(`Text "k", `Tag (6, `Int 10));
@@ -189,7 +187,7 @@ let t =
        `Array [`Int 1; `Int 4; `Tag (6, `Int 8); `Tag (6, `Int 5)];
        `Array [`Int 1; `Int 1; `Tag (6, `Int 9); `Tag (6, `Int 4)]])]
 
-# String.length (Cbor_pack.to_string tree_to_cbpack t);;
+# String.length (Cbor_pack.to_string tree2_to_cbpack t);;
 - : int = 73
 ```
 
@@ -204,8 +202,7 @@ which is more than twice as long.
 - `[@cstor "x"]` on constructor: custom key for this constructor (string)
 - `[@key "x"]` on record field: custom key for this field (string)
 - `[@@hashcons]` on type decl: enable hashconsing for this type.
-- `[@@nohashcons]` on type decl: disable hashconsing for this type.
-- `[@@use_field_names]` on type decl: use strings for record fields, not ints
+- `[@@use_field_names]` on type decl: use strings for record fields, not integer offsets
 
 ## License
 

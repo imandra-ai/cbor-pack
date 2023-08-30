@@ -6,7 +6,7 @@ type x1 =
       z: (bool * char) list; [@key "cz"]
     } [@cstor "c"]
   | D of x1 * x1 [@cstor "d"]
-[@@deriving cbpack, show { with_path = false }]
+[@@deriving cbpack, show { with_path = false }] [@@hashcons]
 
 type x1_alias = x1 [@@deriving cbpack, show]
 
@@ -15,7 +15,9 @@ type x2 = {
   b: x1 list list array;
   c: x2 list option;
 }
-[@@deriving cbpack, show { with_path = false }] [@@cbpack.use_field_names]
+[@@deriving cbpack, show { with_path = false }]
+[@@cbpack.use_field_names]
+[@@hashcons]
 
 let c0 = C { x = Some 3; z = [ true, 'a'; false, 'c' ] }
 
