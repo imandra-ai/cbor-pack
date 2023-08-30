@@ -14,7 +14,7 @@
 (package
  (name cbor-pack)
  (synopsis "Library for CBOR-pack: a sharing-aware serialization format on top of CBOR")
- (depends (ocaml (>= 4.08)) (cbor (>= 0.5)) hmap)
+ (depends (ocaml (>= 4.08)) (cbor (>= 0.5)))
  (tags
   (cbor ocaml)))
 

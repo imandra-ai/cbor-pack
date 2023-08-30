@@ -2,4 +2,4 @@
  (name cbor_pack)
  (synopsis "Serialization format with sharing on top of CBOR")
  (public_name cbor-pack)
- (libraries (re_export cbor) hmap))
+ (libraries (re_export cbor)))

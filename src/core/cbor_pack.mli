@@ -18,15 +18,6 @@ module Ser : sig
   val create : unit -> state
   (** New state. *)
 
-  val hmap : state -> Hmap.t
-  (** Extensible hmap, to put encoder-specific state (e.g.
-      a hashtable to preserve sharing for a given type) *)
-
-  val update_hmap : state -> (Hmap.t -> Hmap.t * 'a) -> 'a
-  (** [update_hmap st f] calls [f cur_hmap] on the current hmap.
-      The call to [f] returns the new hmap, which is assigned in [st],
-      as well as a side value that is returned. *)
-
   type ptr = cbor
   (** An integer + tag for CBOR *)
 
@@ -53,6 +44,19 @@ module Ser : sig
 
   val add_bytes : ?hashcons:bool -> state -> bytes -> cbor
   (** Same as {!add_string} *)
+
+  type 'a cache_key
+
+  val create_cache_key :
+    (module Hashtbl.HashedType with type t = 'a) -> 'a cache_key
+  (** Create a new cache key for a hashable + comparable type. *)
+
+  val with_cache : 'a cache_key -> 'a t -> 'a t
+  (** [with_cache key enc] is the same encoder as [enc], but
+      with caching. When encoding a value [x:'a],
+      the cache [key] is used to detect if [x] was already
+      encoded to some entry, and uses a pointer to this entry
+      instead of re-serializing [x]. *)
 
   val finalize_cbor : state -> key:cbor -> cbor
   (** Turn the state into a pack with given [key] as entrypoint. *)
@@ -90,6 +94,12 @@ module Deser : sig
   (** Get an item via its pointer.
       @raise Invalid_argument if the pointer is invalid. *)
 
+  val fail : string -> 'a
+  (** Fail to decode. *)
+
+  val failf : ('a, unit, string, 'b) format4 -> 'a
+  (** Fail to decode with a formatted message. *)
+
   val to_unit : state -> cbor -> unit
   val to_int : state -> cbor -> int
   val to_bool : state -> cbor -> bool
@@ -125,6 +135,21 @@ module Deser : sig
 
   val parse_exn : string -> state
   (** @raise Error if it fails *)
+
+  type 'a cache_key
+  (** Generative key used to cache values during decoding *)
+
+  val create_cache_key : unit -> _ cache_key
+  (** Generate a new cache key for a type. *)
+
+  val with_cache : 'a cache_key -> 'a t -> 'a t
+  (** [with_cache key dec] is the same decoder as [dec] but
+      it uses [key] to retrieve values directly from
+      an internal table for entries/values that have already
+      been decoded in the past. This means that a value that was
+      encoded with a lot of sharing (e.g in a graph, or a large
+      string using {!Ser.add_string}) will be decoded only once.
+  *)
 
   val entry_key : state -> cbor
   (** Entrypoint for the pack, as used in {!Ser.finalize_cbor}

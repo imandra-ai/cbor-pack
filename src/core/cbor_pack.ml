@@ -3,12 +3,12 @@ module Cbor = CBOR.Simple
 type cbor = CBOR.Simple.t
 
 module Vec = struct
-  type t = {
-    mutable a: cbor array;
+  type 'a t = {
+    mutable a: 'a array;
     mutable sz: int;
   }
 
-  let create () : t = { sz = 0; a = [||] }
+  let create () : _ t = { sz = 0; a = [||] }
   let length self = self.sz
   let cap self = Array.length self.a
 
@@ -35,7 +35,7 @@ module Vec = struct
 
   let to_list self = List.init self.sz (fun i -> self.a.(i))
 
-  let of_list l : t =
+  let of_list l : _ t =
     let v = create () in
     List.iter (push v) l;
     v
@@ -73,10 +73,28 @@ end)
 module Ser = struct
   type ptr = cbor
 
+  module type CACHE_KEY = sig
+    include Hashtbl.HashedType
+
+    val id : int
+  end
+
+  type 'a cache_key = (module CACHE_KEY with type t = 'a)
+  type cache_key_with_val = K : 'a cache_key * 'a -> cache_key_with_val
+
+  module Cache_tbl = Hashtbl.Make (struct
+    type t = cache_key_with_val
+
+    let equal (K ((module C1), v1)) (K ((module C2), v2)) : bool =
+      C1.id = C2.id && C1.equal v1 (Obj.magic v2)
+
+    let hash (K ((module C), v)) = C.hash v
+  end)
+
   type state = {
-    entries: Vec.t;
+    entries: cbor Vec.t;
     hashcons: ptr Cbor_table.t;
-    mutable hmap: Hmap.t;
+    cache: cbor Cache_tbl.t;
   }
 
   type 'a t = state -> 'a -> cbor
@@ -85,7 +103,7 @@ module Ser = struct
     {
       entries = Vec.create ();
       hashcons = Cbor_table.create 16;
-      hmap = Hmap.empty;
+      cache = Cache_tbl.create 8;
     }
 
   let[@inline] mk_ptr_ n = `Tag (tag_ptr, `Int n)
@@ -98,12 +116,6 @@ module Ser = struct
   let[@inline] map x : cbor = `Map x
   let[@inline] string x : cbor = `Text x
   let[@inline] bytes x : cbor = `Bytes (Bytes.unsafe_to_string x)
-  let[@inline] hmap self = self.hmap
-
-  let update_hmap (self : state) f =
-    let new_hmap, x = f self.hmap in
-    self.hmap <- new_hmap;
-    x
 
   let add_entry ?(hashcons = false) (self : state) (c : cbor) : ptr =
     match c with
@@ -136,6 +148,32 @@ module Ser = struct
     else
       c
 
+  let id_ = ref 0
+
+  let create_cache_key (type a) (module H : Hashtbl.HashedType with type t = a)
+      : a cache_key =
+    let id =
+      incr id_;
+      !id_
+    in
+    (module struct
+      include H
+
+      let id = id
+    end)
+
+  let with_cache (key : 'a cache_key) (enc : 'a t) : 'a t =
+   fun st (x : 'a) : cbor ->
+    let k = K (key, x) in
+    match Cache_tbl.find_opt st.cache k with
+    | Some c -> c
+    | None ->
+      (* encode [x], and make sure it's an entry (or scalar) so we can reuse a
+         pointer to it later *)
+      let c = add_entry st (enc st x) in
+      Cache_tbl.add st.cache k c;
+      c
+
   let finalize_cbor (self : state) ~key : cbor =
     map [ `Text "k", key; `Text "h", `Array (Vec.to_list self.entries) ]
 
@@ -154,9 +192,19 @@ let to_string ser x =
   Ser.finalize_string st ~key
 
 module Deser = struct
+  type cached = ..
+
+  module type CACHE_KEY = sig
+    type elt
+    type cached += C of elt
+  end
+
+  type 'a cache_key = (module CACHE_KEY with type elt = 'a)
+
   type state = {
-    entries: Vec.t;  (** heap *)
+    entries: cbor Vec.t;  (** heap *)
     key: cbor;  (** entrypoint *)
+    cache: cached Cbor_table.t;
   }
 
   type 'a or_error = ('a, string) result
@@ -164,8 +212,8 @@ module Deser = struct
 
   exception Error = CBOR.Error
 
-  let error_ s = raise (Error s)
-  let errorf_ s = Printf.ksprintf error_ s
+  let fail s = raise (Error s)
+  let failf s = Printf.ksprintf fail s
 
   type ptr = int
 
@@ -173,7 +221,7 @@ module Deser = struct
 
   let deref self (n : ptr) =
     if n >= Vec.length self.entries then
-      error_ "cbor_pack.deser.deref: invalid index";
+      fail "cbor_pack.deser.deref: invalid index";
     Vec.get self.entries n
 
   let rec deref_if_ptr self (x : cbor) : cbor =
@@ -186,60 +234,60 @@ module Deser = struct
   let to_unit state c =
     match deref_if_ptr state c with
     | `Null -> ()
-    | _ -> error_ "expected null"
+    | _ -> fail "expected null"
 
   let to_int_ = function
     | `Int i -> i
-    | _ -> error_ "expected integer"
+    | _ -> fail "expected integer"
 
   let to_int state c = to_int_ @@ deref_if_ptr state c
 
   let to_bool state c =
     match deref_if_ptr state c with
     | `Bool x -> x
-    | _ -> error_ "expected bool"
+    | _ -> fail "expected bool"
 
   let to_float state c =
     match deref_if_ptr state c with
     | `Float x -> x
-    | _ -> error_ "expected float"
+    | _ -> fail "expected float"
 
   let to_list_ = function
     | `Array x -> x
-    | _ -> error_ "expected array"
+    | _ -> fail "expected array"
 
   let to_list state c = to_list_ @@ deref_if_ptr state c
 
   let to_list_of f state c =
     match deref_if_ptr state c with
     | `Array x -> List.map (f state) x
-    | _ -> error_ "expected array"
+    | _ -> fail "expected array"
 
   let to_map_no_deref_ = function
     | `Map l -> l
-    | _ -> error_ "expected map"
+    | _ -> fail "expected map"
 
   let to_map state c = to_map_no_deref_ @@ deref_if_ptr state c
 
   let to_text state c =
     match deref_if_ptr state c with
     | `Text x -> x
-    | _ -> error_ "expected text"
+    | _ -> fail "expected text"
 
   let to_bytes state c =
     match deref_if_ptr state c with
     | `Bytes x -> Bytes.unsafe_of_string x
-    | _ -> error_ "expected bytes"
+    | _ -> fail "expected bytes"
 
   let to_any_tag state c =
     match deref_if_ptr state c with
     | `Tag (j, sub) -> j, sub
-    | _ -> error_ "expected (any) tag"
+    | _ -> fail "expected (any) tag"
 
   let to_tag_ i = function
     | `Tag (j, sub) when i = j -> sub
-    | `Tag _ -> error_ "wrong tag"
-    | _ -> errorf_ "expected tag %d" i
+    | `Tag _ -> fail "wrong tag"
+    | _ -> failf "expected tag %d" i
 
   let to_tag i state c = to_tag_ i @@ deref_if_ptr state c
   let[@inline] to_ptr x : ptr = to_int_ @@ to_tag_ tag_ptr x
@@ -251,13 +299,31 @@ module Deser = struct
 
   let map_entry_no_deref_ ~k (c : cbor) : cbor =
     let m = to_map_no_deref_ c in
-    try List.assoc k m with Not_found -> error_ "cannot find key in map"
+    try List.assoc k m with Not_found -> fail "cannot find key in map"
 
   let map_entry ~k state (c : cbor) : cbor =
     let m = to_map state c in
-    try List.assoc k m with Not_found -> error_ "cannot find key in map"
+    try List.assoc k m with Not_found -> fail "cannot find key in map"
 
-  let entry_key self = self.key
+  let create_cache_key (type a) () : a cache_key =
+    (module struct
+      type elt = a
+      type cached += C of a
+    end)
+
+  let with_cache (type a) (key : a cache_key) (dec : a t) : a t =
+   fun st c ->
+    let (module K) = key in
+    let c = deref_if_ptr st c in
+    match Cbor_table.find_opt st.cache c with
+    | Some (K.C v) -> v
+    | Some _ -> dec st c
+    | None ->
+      let v = dec st c in
+      Cbor_table.add st.cache c (K.C v);
+      v
+
+  let[@inline] entry_key self = self.key
 
   let of_cbor_ c : state =
     (* NOTE: keep in touch with [Ser.finalize] *)
@@ -265,7 +331,8 @@ module Deser = struct
     let entries =
       map_entry_no_deref_ ~k:(`Text "h") c |> to_list_ |> Vec.of_list
     in
-    { entries; key }
+    let cache = Cbor_table.create 8 in
+    { entries; key; cache }
 
   let parse s : state or_error =
     try
