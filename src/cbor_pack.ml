@@ -41,10 +41,12 @@ module Vec = struct
     v
 end
 
-(* 6 is not used, and fits in a single byte:
-   https://www.iana.org/assignments/cbor-tags/cbor-tags.xhtml *)
+(** Tag for pointers.
+    [6] is not used, and fits in a single byte:
+    See {{: https://www.iana.org/assignments/cbor-tags/cbor-tags.xhtml} the registry}. *)
 let tag_ptr = 6
 
+(** Main hashconsing table *)
 module Cbor_table = Hashtbl.Make (struct
   type t = cbor
 
