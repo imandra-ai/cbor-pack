@@ -102,11 +102,6 @@ module Deser : sig
 
   val ( let+ ) : 'a t -> ('a -> 'b) -> 'b t
   val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
-
-  type 'a key
-
-  val make_key : name:string -> unit -> 'a key
-  val name_of_key : _ key -> string
   val parse : string -> state or_error
 
   val parse_exn : string -> state
@@ -124,9 +119,8 @@ module Deser : sig
 end
 
 val of_cbor_exn : 'a Deser.t -> cbor -> 'a
-(** [of_cbor_exn deser heap ~key] deserializes an object using [deser]
-    from the shared heap [heap], starting at [key].
-    [key] is typically a pointer. *)
+(** [of_cbor_exn deser cbor] deserializes an object using [deser]
+    from the shared heap [cbor.h], starting at [cbor.key]. *)
 
 val of_cbor : 'a Deser.t -> cbor -> 'a Deser.or_error
 (** Deserialize a pack into a value of type ['a] *)

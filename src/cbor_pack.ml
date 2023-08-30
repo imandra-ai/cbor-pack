@@ -170,17 +170,12 @@ module Ser = struct
   type state = {
     entries: Vec.t;
     hashcons: ptr Cbor_table.t;
-    cycle: ptr Obj_table.t;
   }
 
   type 'a t = state -> 'a -> cbor
 
   let create () : state =
-    {
-      entries = Vec.create ();
-      hashcons = Cbor_table.create 16;
-      cycle = Obj_table.create 16;
-    }
+    { entries = Vec.create (); hashcons = Cbor_table.create 16 }
 
   let mk_ptr_ n = `Tag (tag_ptr, `Int n)
   let unit : cbor = `Null
@@ -345,39 +340,6 @@ module Deser = struct
   let map_entry ~k state (c : cbor) : cbor =
     let m = to_map state c in
     try List.assoc k m with Not_found -> error_ "cannot find key in map"
-
-  (*
-  let add_cycle_entry state ptr e =
-    Cbor_table.add state.cycle ptr e
-
-  let find_cycle_entry state ptr =
-    try Cbor_table.find state.cycle ptr
-    with Not_found -> Not_found
-     *)
-
-  module type KEY = sig
-    type t
-
-    val name : string
-
-    exception E of t lazy_t
-  end
-
-  type 'a key = (module KEY with type t = 'a)
-
-  let make_key (type a) ~name () : a key =
-    (module struct
-      type t = a
-
-      let name = name
-
-      exception E of t lazy_t
-    end : KEY
-      with type t = a)
-
-  let name_of_key (type a) (k : a key) =
-    let (module K : KEY with type t = a) = k in
-    K.name
 
   let entry_key self = self.key
 
