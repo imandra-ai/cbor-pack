@@ -112,10 +112,11 @@ module Ser = struct
   let[@inline] bool x : cbor = `Bool x
   let[@inline] float x : cbor = `Float x
   let[@inline] list x : cbor = `Array x
-  let[@inline] list_of f x = list (List.map f x)
   let[@inline] map x : cbor = `Map x
   let[@inline] string x : cbor = `Text x
   let[@inline] bytes x : cbor = `Bytes (Bytes.unsafe_to_string x)
+  let list_of f st x = list (List.map (f st) x)
+  let map_of fk fv st x = map (List.map (fun (k, v) -> fk st k, fv st v) x)
 
   let add_entry ?(hashcons = false) (self : state) (c : cbor) : ptr =
     match c with

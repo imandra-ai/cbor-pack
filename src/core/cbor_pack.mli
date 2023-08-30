@@ -28,8 +28,12 @@ module Ser : sig
   val string : string -> cbor
   val bytes : bytes -> cbor
   val list : cbor list -> cbor
-  val list_of : ('a -> cbor) -> 'a list -> cbor
   val map : (cbor * cbor) list -> cbor
+
+  val list_of : 'a t -> 'a list t
+  (** [list_of ser] encodes a list of values using [ser] for each *)
+
+  val map_of : 'a t -> 'b t -> ('a * 'b) list t
 
   val add_entry : ?hashcons:bool -> state -> cbor -> ptr
   (** [add_entry st c] turns [c] as a heap entry and returns

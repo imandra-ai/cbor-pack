@@ -180,12 +180,13 @@ let rec ser_expr_of_ty (e : expression) ~(ty : core_type) : expression =
   | [%type: [%t? ty_arg0] list] ->
     [%expr
       Cbor_pack.Ser.list_of
-        (fun x -> [%e ser_expr_of_ty [%expr x] ~ty:ty_arg0])
-        [%e e]]
+        (fun ser x -> [%e ser_expr_of_ty [%expr x] ~ty:ty_arg0])
+        ser [%e e]]
   | [%type: [%t? ty_arg0] array] ->
     [%expr
       Cbor_pack.Ser.list_of
-        (fun x -> [%e ser_expr_of_ty [%expr x] ~ty:ty_arg0])
+        (fun ser x -> [%e ser_expr_of_ty [%expr x] ~ty:ty_arg0])
+        ser
         (Array.to_list [%e e])]
   | { ptyp_desc = Ptyp_var v; ptyp_loc = loc; _ } ->
     (* use function passed as a parameter for each polymorphic argument *)
