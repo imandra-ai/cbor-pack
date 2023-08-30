@@ -2,75 +2,6 @@ module Cbor = CBOR.Simple
 
 type cbor = CBOR.Simple.t
 
-module H = struct
-  (* FNV hashing
-     https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function
-  *)
-  let fnv_offset_basis = 0xcbf29ce484222325L
-  let fnv_prime = 0x100000001b3L
-
-  (* hash an integer *)
-  let int64 n : int =
-    let h = ref fnv_offset_basis in
-    for k = 0 to 7 do
-      (h := Int64.(mul !h fnv_prime));
-      h := Int64.(logxor !h (logand (shift_left n (k * 8)) 0xffL))
-    done;
-    (* truncate back to int and remove sign *)
-    Int64.(to_int !h) land max_int
-
-  let[@inline] int x = int64 (Int64.of_int x)
-
-  let bool x =
-    if x then
-      int 1
-    else
-      int 0
-
-  let combine2 a b =
-    let h = ref fnv_offset_basis in
-    (* we only do one loop, where we mix bytes of [a] and [b], so as
-       to simplify control flow *)
-    for k = 0 to 7 do
-      (h := Int64.(mul !h fnv_prime));
-      (h := Int64.(logxor !h (of_int ((a lsr (k * 8)) land 0xff))));
-      (h := Int64.(mul !h fnv_prime));
-      h := Int64.(logxor !h (of_int ((b lsr (k * 8)) land 0xff)))
-    done;
-    Int64.to_int !h land max_int
-
-  let combine3 a b c =
-    let h = ref fnv_offset_basis in
-    (* we only do one loop, where we mix bytes of [a] [b] and [c], so as
-       to simplify control flow *)
-    for k = 0 to 7 do
-      (h := Int64.(mul !h fnv_prime));
-      (h := Int64.(logxor !h (of_int ((a lsr (k * 8)) land 0xff))));
-      (h := Int64.(mul !h fnv_prime));
-      (h := Int64.(logxor !h (of_int ((b lsr (k * 8)) land 0xff))));
-      (h := Int64.(mul !h fnv_prime));
-      h := Int64.(logxor !h (of_int ((c lsr (k * 8)) land 0xff)))
-    done;
-    Int64.to_int !h land max_int
-
-  let pair f g (x, y) = combine2 (f x) (g y)
-  let list f l = List.fold_left (fun h x -> combine2 h (f x)) 0x42 l
-
-  (* do not hash more than 128 bytes in strings/bytes *)
-  let max_len_b_ = 128
-
-  let bytes (x : bytes) =
-    let h = ref fnv_offset_basis in
-    for i = 0 to min max_len_b_ (Bytes.length x) do
-      (h := Int64.(mul !h fnv_prime));
-      let byte = Char.code (Bytes.unsafe_get x i) in
-      h := Int64.(logxor !h (of_int byte))
-    done;
-    Int64.to_int !h land max_int
-
-  let string (x : string) = bytes (Bytes.unsafe_of_string x)
-end
-
 module Vec = struct
   type t = {
     mutable a: cbor array;
@@ -134,27 +65,7 @@ module Cbor_table = Hashtbl.Make (struct
     | `Tag (x, u), `Tag (y, v) -> x = y && equal u v
     | _ -> false
 
-  let hash (c : cbor) =
-    let rec hash_rec d c =
-      if d = 2 then
-        H.int 42
-      else (
-        let hash = hash_rec (d - 1) in
-        match c with
-        | `Null -> H.int 0
-        | `Undefined -> H.int 1
-        | `Simple x -> H.combine2 2 (H.int x)
-        | `Bool x -> H.combine2 3 (H.bool x)
-        | `Int x -> H.combine2 4 (H.int x)
-        | `Float x -> H.combine2 5 (H.int64 @@ Int64.bits_of_float x)
-        | `Bytes x -> H.combine2 6 (H.string x)
-        | `Text x -> H.combine2 7 (H.string x)
-        | `Array l -> H.combine2 8 (H.list hash l)
-        | `Map l -> H.combine2 9 (H.list (H.pair hash hash) l)
-        | `Tag (x, y) -> H.combine3 10 (H.int x) (hash y)
-      )
-    in
-    hash_rec 0 c
+  let[@inline] hash (c : cbor) : int = Hashtbl.hash_param 16 100 c
 end)
 
 module Ser = struct
