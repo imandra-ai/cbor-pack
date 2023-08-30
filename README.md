@@ -46,13 +46,14 @@ and in the code:
 ```
 
 ```ocaml
-type foo = {
+# type foo = {
   x: int;
   y: (string [@as_bytes]);
-} [@@deriving cbpack] ;;
+Line 4, characters 1-3:
+Error: Syntax error
 ```
 
-which will create functions with the signature:
+which creates two functions:
 
 <!-- $MDX skip -->
 ```ocaml
@@ -75,11 +76,13 @@ type foo = {
 Then we can encode a value:
 
 ```ocaml
-# #install_printer Cbor_pack.pp_diagnostic;;
 # let my_foo = { a = 1; b = 2.0 };;
 val my_foo : foo = {a = 1; b = 2.}
 # let c = Cbor_pack.to_cbor foo_to_cbpack my_foo;;
-val c : Cbor_pack.cbor = {h=[0: {0: 1, 1: 2.}; ]; k=6(0)}
+val c : Cbor_pack.cbor =
+  `Map
+    [(`Text "k", `Tag (6, `Int 0));
+     (`Text "h", `Array [`Map [(`Int 0, `Int 1); (`Int 1, `Float 2.)]])]
 
 # CBOR.Simple.to_diagnostic c |> print_endline;;
 {"k": 6(0), "h": [{0: 1, 1: 2.}]}
@@ -139,12 +142,14 @@ a similarly-shaped tree. Here, instead, we obtain this:
 ```ocaml
 # Cbor_pack.to_cbor tree_to_cbpack t;;
 - : Cbor_pack.cbor =
-{h=[0: [1, 2, 0, 0];
-    1: [1, 3, 6(0), 6(0)];
-    2: [1, 4, 6(1), 6(0)];
-    3: [1, 1, 6(2), 6(2)];
-    ];
- k=6(3)}
+`Map
+  [(`Text "k", `Tag (6, `Int 3));
+   (`Text "h",
+    `Array
+      [`Array [`Int 1; `Int 2; `Int 0; `Int 0];
+       `Array [`Int 1; `Int 3; `Tag (6, `Int 0); `Tag (6, `Int 0)];
+       `Array [`Int 1; `Int 4; `Tag (6, `Int 1); `Tag (6, `Int 0)];
+       `Array [`Int 1; `Int 1; `Tag (6, `Int 2); `Tag (6, `Int 2)]])]
 
 # String.length (Cbor_pack.to_string tree_to_cbpack t);;
 - : int = 34
@@ -168,19 +173,21 @@ let t =
 ```ocaml
 # Cbor_pack.to_cbor tree_to_cbpack t;;
 - : Cbor_pack.cbor =
-{h=[0: [1, 2, 0, 0];
-    1: [1, 2, 0, 0];
-    2: [1, 2, 0, 0];
-    3: [1, 3, 6(2), 6(1)];
-    4: [1, 4, 6(3), 6(0)];
-    5: [1, 2, 0, 0];
-    6: [1, 2, 0, 0];
-    7: [1, 2, 0, 0];
-    8: [1, 3, 6(7), 6(6)];
-    9: [1, 4, 6(8), 6(5)];
-    10: [1, 1, 6(9), 6(4)];
-    ];
- k=6(10)}
+`Map
+  [(`Text "k", `Tag (6, `Int 10));
+   (`Text "h",
+    `Array
+      [`Array [`Int 1; `Int 2; `Int 0; `Int 0];
+       `Array [`Int 1; `Int 2; `Int 0; `Int 0];
+       `Array [`Int 1; `Int 2; `Int 0; `Int 0];
+       `Array [`Int 1; `Int 3; `Tag (6, `Int 2); `Tag (6, `Int 1)];
+       `Array [`Int 1; `Int 4; `Tag (6, `Int 3); `Tag (6, `Int 0)];
+       `Array [`Int 1; `Int 2; `Int 0; `Int 0];
+       `Array [`Int 1; `Int 2; `Int 0; `Int 0];
+       `Array [`Int 1; `Int 2; `Int 0; `Int 0];
+       `Array [`Int 1; `Int 3; `Tag (6, `Int 7); `Tag (6, `Int 6)];
+       `Array [`Int 1; `Int 4; `Tag (6, `Int 8); `Tag (6, `Int 5)];
+       `Array [`Int 1; `Int 1; `Tag (6, `Int 9); `Tag (6, `Int 4)]])]
 
 # String.length (Cbor_pack.to_string tree_to_cbpack t);;
 - : int = 73

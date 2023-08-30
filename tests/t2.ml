@@ -17,8 +17,6 @@ type x2 = {
 }
 [@@deriving cbpack, show { with_path = false }] [@@cbpack.use_field_names]
 
-let st = Cbor_pack.Ser.create ()
-
 let c0 = C { x = Some 3; z = [ true, 'a'; false, 'c' ] }
 
 let myx2 =
@@ -38,7 +36,6 @@ Format.printf "start with myx2:@.%a@." pp_x2 myx2
 let s = Cbor_pack.to_string x2_to_cbpack myx2;;
 
 Printf.printf "serialized to %S\n" s;;
-
 Printf.printf "len: %d\n" (String.length s)
 
 let s' = Marshal.to_string myx2 [ Marshal.No_sharing ];;
@@ -51,7 +48,6 @@ Format.printf "deserialized CBOR value: %a@." Cbor_pack.Deser.pp_diagnostic
   deser
 
 let ptr0 = Cbor_pack.Deser.entry_key deser
-
 let r = Cbor_pack.Deser.(deref deser (to_ptr ptr0));;
 
 Format.printf "deref cbor ptr: %a@." Cbor_pack.pp_diagnostic r
@@ -59,7 +55,6 @@ Format.printf "deref cbor ptr: %a@." Cbor_pack.pp_diagnostic r
 let foo2 = x2_of_cbpack deser ptr0;;
 
 Format.printf "myx2 after roundtrip:@.%a@." pp_x2 foo2;;
-
 assert (foo2 = myx2)
 
 let s_big = Cbor_pack.to_string x2_to_cbpack myx2_big;;
@@ -77,5 +72,4 @@ Format.printf "deser(myx2_big):@.%a@." pp_x2 foo2_big
 let cbor_big = Cbor_pack.to_cbor x2_to_cbpack myx2_big;;
 
 Format.printf "myx2_big CBOR is:@.%a@." Cbor_pack.pp_diagnostic cbor_big;;
-
 assert (myx2_big = foo2_big)

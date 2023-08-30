@@ -28,5 +28,4 @@ Format.printf "len=%d@." (String.length s)
 let b' = Cbor_pack.of_string_exn bar2_of_cbpack s;;
 
 Format.printf "b': %a@." pp_bar2 b';;
-
 assert (b = b')

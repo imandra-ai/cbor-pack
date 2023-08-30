@@ -25,15 +25,11 @@ let t0 =
   }
 
 let s = Cbor_pack.to_string to_cbpack t0
-
 let cbor = Cbor_pack.to_cbor to_cbpack t0;;
 
 Format.printf "result is %S@." s;;
-
 Format.printf "as cbor: %a@." Cbor_pack.pp_diagnostic cbor;;
-
 Format.printf "len=%d@." (String.length s);;
-
 Format.printf "len if marshalled=%d@." (String.length @@ Marshal.to_string t0 [])
 
 let t0' = Cbor_pack.of_string_exn of_cbpack s;;
