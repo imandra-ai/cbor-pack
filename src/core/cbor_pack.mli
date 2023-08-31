@@ -1,4 +1,19 @@
-(** CBOR-pack *)
+(** CBOR-pack.
+
+  CBOR pack is a data serialization scheme built on top of {{:https://cbor.io/} CBOR}.
+  It introduces a notion of {i heap} (an array of CBOR values) and {i pointers} into
+  this heap (CBOR values consisting of an integer wrapped in a specific tag).
+  The heap is then turned into a CBOR array, so that the resulting "pack" is just a
+  large CBOR value with a specific internal structure (some of which are pointers into
+  the large internal {i heap}).
+
+  When serializing a complex data structure that presents internal sharing (typically,
+  with pointers/references), the heap can be used to represent that sharing directly
+  in the CBOR value. This is done by serializing a value once, adding it to the {i heap}
+  (which is an array); the position of the value in the heap can then be wrapped
+  with tag 6 to become a {i pointer}. All other references to this value are serialized
+  as pointers.
+*)
 
 type cbor = CBOR.Simple.t
 
@@ -22,22 +37,40 @@ module Ser : sig
   (** An integer + tag for CBOR *)
 
   val unit : cbor
+  (** Build a CBOR null *)
+
   val int : int -> cbor
+  (** Build a CBOR integer *)
+
   val bool : bool -> cbor
+  (** Build a CBOR bool *)
+
   val float : float -> cbor
+  (** Build a CBOR float *)
+
   val string : string -> cbor
+  (** Build a CBOR text string (UTF8) *)
+
   val bytes : bytes -> cbor
+  (** Build a CBOR blob (raw bytes) *)
+
   val list : cbor list -> cbor
+  (** Build a CBOR list *)
+
   val map : (cbor * cbor) list -> cbor
+  (** Build a CBOR map *)
 
   val list_of : 'a t -> 'a list t
   (** [list_of ser] encodes a list of values using [ser] for each *)
 
   val map_of : 'a t -> 'b t -> ('a * 'b) list t
+  (** Build a map by serializing the given association list *)
 
   val add_entry : ?hashcons:bool -> state -> cbor -> ptr
-  (** [add_entry st c] turns [c] as a heap entry and returns
+  (** [add_entry st c] turns [c] into a heap entry and returns
       a pointer to it.
+      The pointer is a small CBOR value (a tagged integer).
+
       @param hashcons if true, [c] is first compared to existing
       hashconsed entries (at a runtime cost) to see if we can reuse
       them instead of inserting a new value. *)
