@@ -22,7 +22,7 @@
  (name cbor-pack-ppx)
  (synopsis "Ppx deriver for cbor-pack")
  (depends (ocaml (>= 4.08)) cbor (cbor-pack (= :version))
-          (ppxlib (>= 0.29.0))
+          (ppxlib (>= 0.25.0))
           (ppx_deriving :with-test)
           (mdx (and :with-test (>= 1.9))))
  (tags
