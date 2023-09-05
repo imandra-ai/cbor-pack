@@ -82,6 +82,14 @@ module Ser : sig
   val add_bytes : ?hashcons:bool -> state -> bytes -> cbor
   (** Same as {!add_string} *)
 
+  val delay : (unit -> 'a t) -> 'a t
+  (** [delay f] is like [f()], but [f] is only called when needed. *)
+
+  val fix : ('a t -> 'a t) -> 'a t
+  (** [fix f] is a recursive serializer. [f] receives a serializer
+      for recursive cases and must use it to implement the serialization
+      for the current value. *)
+
   type 'a cache_key
 
   val create_cache_key :
@@ -174,6 +182,9 @@ module Deser : sig
   val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
   (** Bind combinator *)
 
+  val delay : (unit -> 'a t) -> 'a t
+  (** [delay f] is like [f()], but [f] is only called when needed. *)
+
   val parse : string -> state or_error
 
   val parse_exn : string -> state
@@ -199,6 +210,11 @@ module Deser : sig
       encoded with a lot of sharing (e.g in a graph, or a large
       string using {!Ser.add_string}) will be decoded only once.
   *)
+
+  val fix : ('a t -> 'a t) -> 'a t
+  (** [fix f] is a recursive deserializer. [f] receives a deserializer
+      for recursive cases and must use it to implement the deserialization
+      for the current value. *)
 
   val entry_key : state -> cbor
   (** Entrypoint for the pack, as used in {!Ser.finalize_cbor}

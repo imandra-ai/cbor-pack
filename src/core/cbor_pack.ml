@@ -118,6 +118,13 @@ module Ser = struct
   let list_of f st x = list (List.map (f st) x)
   let map_of fk fv st x = map (List.map (fun (k, v) -> fk st k, fv st v) x)
 
+  let[@inline] delay f st x = f() st x
+
+  let fix (f: 'a t -> 'a t) : 'a t =
+    let rec _self = lazy (
+      fun st x -> f (Lazy.force _self) st x
+    ) in Lazy.force _self
+
   let add_entry ?(hashcons = false) (self : state) (c : cbor) : ptr =
     match c with
     | `Tag (t, `Int _) when t == tag_ptr -> c (* do not add pointers *)
@@ -297,6 +304,13 @@ module Deser = struct
   let[@inline] ( let* ) self (f : _ -> _ t) state c =
     let x = self state c in
     f x state c
+
+  let[@inline] delay f st x = (f ()) st x
+
+  let fix (f: 'a t -> 'a t) : 'a t =
+    let rec _self = lazy (
+      fun st x -> f (Lazy.force _self) st x
+    ) in Lazy.force _self
 
   let map_entry_no_deref_ ~k (c : cbor) : cbor =
     let m = to_map_no_deref_ c in
