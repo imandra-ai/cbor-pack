@@ -117,13 +117,11 @@ module Ser = struct
   let[@inline] bytes x : cbor = `Bytes (Bytes.unsafe_to_string x)
   let list_of f st x = list (List.map (f st) x)
   let map_of fk fv st x = map (List.map (fun (k, v) -> fk st k, fv st v) x)
+  let[@inline] delay f st x = f () st x
 
-  let[@inline] delay f st x = f() st x
-
-  let fix (f: 'a t -> 'a t) : 'a t =
-    let rec _self = lazy (
-      fun st x -> f (Lazy.force _self) st x
-    ) in Lazy.force _self
+  let fix (f : 'a t -> 'a t) : 'a t =
+    let rec _self = lazy (fun st x -> f (Lazy.force _self) st x) in
+    Lazy.force _self
 
   let add_entry ?(hashcons = false) (self : state) (c : cbor) : ptr =
     match c with
@@ -220,6 +218,7 @@ module Deser = struct
 
   exception Error = CBOR.Error
 
+  let return x _st _c = x
   let fail s = raise (Error s)
   let failf s = Printf.ksprintf fail s
 
@@ -307,10 +306,9 @@ module Deser = struct
 
   let[@inline] delay f st x = (f ()) st x
 
-  let fix (f: 'a t -> 'a t) : 'a t =
-    let rec _self = lazy (
-      fun st x -> f (Lazy.force _self) st x
-    ) in Lazy.force _self
+  let fix (f : 'a t -> 'a t) : 'a t =
+    let rec _self = lazy (fun st x -> f (Lazy.force _self) st x) in
+    Lazy.force _self
 
   let map_entry_no_deref_ ~k (c : cbor) : cbor =
     let m = to_map_no_deref_ c in

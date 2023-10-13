@@ -145,6 +145,8 @@ module Deser : sig
   (** Get an item via its pointer.
       @raise Invalid_argument if the pointer is invalid. *)
 
+  val return : 'a -> 'a t
+
   val fail : string -> 'a
   (** Fail to decode. *)
 
