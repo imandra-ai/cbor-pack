@@ -18,6 +18,9 @@ jobs:
           - '5.0.0'
     runs-on: ${{ matrix.os }}
     steps:
+    - uses: imandra-ai/imandra-build-config/actions/slack-send-build-status@master
+      with:
+        slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
     - uses: actions/checkout@v2
     - uses: ocaml/setup-ocaml@v2
       with:
@@ -28,11 +31,3 @@ jobs:
     - run: opam exec -- dune build --ignore-promoted-rules
     - run: opam exec -- dune runtest --ignore-promoted-rules
       if: ${{ matrix.os == 'ubuntu-latest' && matrix.ocaml-compiler == '5.0.0' }}
-    - uses: 8398a7/action-slack@v3
-      with:
-        status: ${{ job.status }}
-        fields: workflow,commit,repo,ref
-          # fields: workflow,commit,repo,ref,author
-      env:
-        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-      if: always()
