@@ -4,6 +4,12 @@ on:
   pull_request:
     branches:
       - main
+
+permissions:
+  id-token: write
+  contents: read
+  statuses: write
+
 jobs:
   run:
     name: build
