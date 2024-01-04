@@ -1,0 +1,6 @@
+
+(library
+  (name cbor_pack_dump)
+  (public_name cbor-pack.dump)
+  (synopsis "Dump a CBOR pack value, for debugging purposes")
+  (libraries cbor-pack))

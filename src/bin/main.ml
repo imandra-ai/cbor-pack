@@ -21,20 +21,6 @@ module Config = struct
 end
 
 module Dump = struct
-  type t =
-    [ `Null
-    | `Undefined
-    | `Simple of int
-    | `Bool of bool
-    | `Int of int
-    | `Float of float
-    | `Bytes of string
-    | `Text of string
-    | `Array of t list
-    | `Map of (t * t) list
-    | `Tag of int * t
-    ]
-
   let to_hex s =
     let hex_char x =
       if x <= 9 then
