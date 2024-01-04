@@ -65,14 +65,73 @@ module Dump = struct
       true
     with Exit -> false
 
-  let rec dump_c (indent : int) (oc : out_channel) (c : CP.cbor) : unit =
+  let rec deref (deser : CP.Deser.state) (i : int) =
+    let c = CP.Private_.deser_heap_get deser i in
+    match c with
+    | `Tag (6, `Int j) -> deref deser j
+    | _ -> c
+
+  let rec dump_immediate (c : CP.cbor) : string =
+    match c with
+    | `Null -> "null"
+    | `Undefined -> "undefined"
+    | `Simple i -> spf "s(%d)" i
+    | `Int i -> spf "%d" i
+    | `Bool b -> spf "%b" b
+    | `Float f -> spf "%f" f
+    | `Text s ->
+      if String.length s > 20 then
+        spf "%S[…%d omitted]" (String.sub s 0 20) (String.length s - 20)
+      else
+        spf "%S" s
+    | `Bytes b -> spf "bytes(%d))" (String.length b)
+    | `Array l -> spf "array(%d)" (List.length l)
+    | `Map l -> spf "map(%d)" (List.length l)
+    | `Tag (c, x) -> spf "%d(%s)" c (dump_immediate x)
+
+  let rec dump_short (deser : CP.Deser.state) depth (c : CP.cbor) : string =
+    let[@inline] recurse c =
+      if depth <= 0 then
+        dump_immediate c
+      else
+        dump_short deser (depth - 1) c
+    in
+    match c with
+    | `Null -> "null"
+    | `Undefined -> "undefined"
+    | `Simple i -> spf "s(%d)" i
+    | `Int i -> spf "%d" i
+    | `Bool b -> spf "%b" b
+    | `Float f -> spf "%f" f
+    | `Text s ->
+      if String.length s > 20 then
+        spf "%S[…%d omitted]" (String.sub s 0 20) (String.length s - 20)
+      else
+        spf "%S" s
+    | `Bytes b -> spf "bytes(%d))" (String.length b)
+    | `Array l ->
+      (match l with
+      | x :: y :: z :: (_ :: _ as tl) ->
+        spf "[%s,%s,%s,…(%d)]" (recurse x) (recurse y) (recurse z)
+          (List.length tl)
+      | _ -> spf "[%s]" (String.concat "," @@ List.map recurse l))
+    | `Map l ->
+      let ppkv (k, v) = spf "%s: %s" (recurse k) (recurse v) in
+      (match l with
+      | kv1 :: kv2 :: kv3 :: (_ :: _ as tl) ->
+        spf "{%s,%s,%s,…(%d)]" (ppkv kv1) (ppkv kv2) (ppkv kv3) (List.length tl)
+      | _ -> spf "{%s}" (String.concat "," @@ List.map ppkv l))
+    | `Tag (6, `Int i) -> recurse (deref deser i)
+    | `Tag (c, x) -> spf "%d(%s)" c (recurse x)
+
+  let rec dump_c (deser : CP.Deser.state) (indent : int) (oc : out_channel)
+      (c : CP.cbor) : unit =
     match c with
     | `Null -> fpf oc "null"
     | `Undefined -> fpf oc "undefined"
     | `Simple i -> fpf oc "s(%d)" i
     | `Int i -> fpf oc "%d" i
     | `Bool b -> fpf oc "%b" b
-    | `Tag (c, x) -> fpf oc "%d(%a)" c (dump_c indent) x
     | `Float f -> fpf oc "%f" f
     | `Text s -> fpf oc "%S" s
     | `Bytes b ->
@@ -84,24 +143,31 @@ module Dump = struct
       fpf oc "array(%d)" (List.length l);
       List.iteri
         (fun i x ->
-          fpf oc "\n%a- [%d] %a" add_indent indent i (dump_c (indent + 2)) x)
+          fpf oc "\n%a- [%d] %a" add_indent indent i
+            (dump_c deser (indent + 2))
+            x)
         l
     | `Map l ->
       fpf oc "map(%d)" (List.length l);
       List.iter
         (fun (x, y) ->
           fpf oc "\n%a- %a:\n%a%a" add_indent indent
-            (dump_c (indent + 2))
+            (dump_c deser (indent + 2))
             x add_indent (indent + 2)
-            (dump_c (indent + 2))
+            (dump_c deser (indent + 2))
             y)
         l
+    | `Tag (6, `Int i) ->
+      let pointee = deref deser i in
+      fpf oc "ptr(%d)\n%a(… %s)" i add_indent (indent + 2)
+        (dump_short deser 3 pointee)
+    | `Tag (c, x) -> fpf oc "%d(%a)" c (dump_c deser indent) x
 
   let dump (oc : out_channel) (self : CP.Deser.state) : unit =
     fpf oc "heap:\n";
     CP.Private_.deser_heap_iter self (fun i x ->
-        fpf oc "  %d: %a\n" i (dump_c 4) x);
-    fpf oc "key: %a\n" (dump_c 2) (CP.Private_.deser_key self);
+        fpf oc "  %d: %a\n" i (dump_c self 4) x);
+    fpf oc "key: %a\n" (dump_c self 2) (CP.Private_.deser_key self);
     ()
 end
 

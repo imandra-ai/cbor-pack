@@ -245,4 +245,5 @@ val of_string : 'a Deser.t -> string -> 'a Deser.or_error
 module Private_ : sig
   val deser_key : Deser.state -> cbor
   val deser_heap_iter : Deser.state -> (int -> cbor -> unit) -> unit
+  val deser_heap_get : Deser.state -> int -> cbor
 end

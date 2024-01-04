@@ -408,4 +408,5 @@ let of_string deser h =
 module Private_ = struct
   let deser_key (st : Deser.state) = st.key
   let deser_heap_iter (st : Deser.state) f = Vec.iteri f st.entries
+  let deser_heap_get (st : Deser.state) i = Vec.get st.entries i
 end
