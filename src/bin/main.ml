@@ -54,7 +54,8 @@ module Dump = struct
       output_char oc ' '
     done
 
-  let is_printable (s : string) =
+  (** Does [s] print ok with "%S"? *)
+  let string_is_printable (s : string) : bool =
     try
       let[@inline] is_ok = function
         | '\x07' .. '\x0d' -> true
@@ -71,6 +72,7 @@ module Dump = struct
     | `Tag (6, `Int j) -> deref deser j
     | _ -> c
 
+  (** Dump immediate values, and a trivial summary for the rest *)
   let rec dump_immediate (c : CP.cbor) : string =
     match c with
     | `Null -> "null"
@@ -84,17 +86,30 @@ module Dump = struct
         spf "%S[…%d omitted]" (String.sub s 0 20) (String.length s - 20)
       else
         spf "%S" s
-    | `Bytes b -> spf "bytes(%d))" (String.length b)
-    | `Array l -> spf "array(%d)" (List.length l)
-    | `Map l -> spf "map(%d)" (List.length l)
+    | `Bytes b -> spf "bytes(…[%d omitted])" (String.length b)
+    | `Array l -> spf "[…[%d omitted]]" (List.length l)
+    | `Map l -> spf "{…[%d omitted]}" (List.length l)
     | `Tag (c, x) -> spf "%d(%s)" c (dump_immediate x)
 
-  let rec dump_short (deser : CP.Deser.state) depth (c : CP.cbor) : string =
+  let dump_bytes_summary b : string =
+    let b, tail =
+      if String.length b > 20 then
+        String.sub b 0 20, spf "…[%dB omitted]" (String.length b - 20)
+      else
+        b, ""
+    in
+    if string_is_printable b then
+      spf "bytes(%S%s)" b tail
+    else
+      spf "bytes(h'%s%s')" (to_hex b) tail
+
+  (** Dump a summary of the value, including small map/arrays *)
+  let rec dump_summary (deser : CP.Deser.state) depth (c : CP.cbor) : string =
     let[@inline] recurse c =
       if depth <= 0 then
         dump_immediate c
       else
-        dump_short deser (depth - 1) c
+        dump_summary deser (depth - 1) c
     in
     match c with
     | `Null -> "null"
@@ -108,7 +123,7 @@ module Dump = struct
         spf "%S[…%d omitted]" (String.sub s 0 20) (String.length s - 20)
       else
         spf "%S" s
-    | `Bytes b -> spf "bytes(%d))" (String.length b)
+    | `Bytes b -> dump_bytes_summary b
     | `Array l ->
       (match l with
       | x :: y :: z :: (_ :: _ as tl) ->
@@ -135,38 +150,40 @@ module Dump = struct
     | `Float f -> fpf oc "%f" f
     | `Text s -> fpf oc "%S" s
     | `Bytes b ->
-      if is_printable b then
+      if string_is_printable b then
         fpf oc "bytes(%S)" b
       else
         fpf oc "bytes(h'%s')" (to_hex b)
+    | `Array [] -> fpf oc "[]"
     | `Array l ->
-      fpf oc "array(%d)" (List.length l);
+      fpf oc "Array [";
       List.iteri
         (fun i x ->
-          fpf oc "\n%a- [%d] %a" add_indent indent i
-            (dump_c deser (indent + 2))
-            x)
-        l
+          if i > 0 then fpf oc ",";
+          fpf oc "\n%a %a" add_indent indent (dump_c deser (indent + 2)) x)
+        l;
+      fpf oc " ]"
+    | `Map [] -> fpf oc "{}"
     | `Map l ->
-      fpf oc "map(%d)" (List.length l);
+      fpf oc "Map {";
       List.iter
         (fun (x, y) ->
-          fpf oc "\n%a- %a:\n%a%a" add_indent indent
+          fpf oc "\n%a%a:\n%a%a" add_indent indent
             (dump_c deser (indent + 2))
             x add_indent (indent + 2)
             (dump_c deser (indent + 2))
             y)
-        l
+        l;
+      fpf oc " }"
     | `Tag (6, `Int i) ->
       let pointee = deref deser i in
-      fpf oc "ptr(%d)\n%a(… %s)" i add_indent (indent + 2)
-        (dump_short deser 3 pointee)
+      fpf oc "&%s @%d" (dump_summary deser 3 pointee) i
     | `Tag (c, x) -> fpf oc "%d(%a)" c (dump_c deser indent) x
 
   let dump (oc : out_channel) (self : CP.Deser.state) : unit =
     fpf oc "heap:\n";
     CP.Private_.deser_heap_iter self (fun i x ->
-        fpf oc "  %d: %a\n" i (dump_c self 4) x);
+        fpf oc "  %06d: %a\n" i (dump_c self 4) x);
     fpf oc "key: %a\n" (dump_c self 2) (CP.Private_.deser_key self);
     ()
 end
