@@ -28,4 +28,13 @@
  (tags
   (cbor ocaml ppx)))
 
+(package
+  (name cbor-pack-tk)
+  (synopsis "Cbor-pack toolkit")
+  (depends
+    (ocaml (>= 4.08))
+    (yojson (>= 1.6))
+    camlzip
+    (cbor-pack (= :version))))
+
 ; See the complete stanza docs at https://dune.readthedocs.io/en/stable/dune-files.html#dune-project

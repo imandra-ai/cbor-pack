@@ -1,0 +1,6 @@
+
+(executable
+  (name main)
+  (public_name cbpacktk)
+  (package cbor-pack-tk)
+  (libraries cbor cbor-pack yojson camlzip))

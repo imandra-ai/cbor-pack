@@ -404,3 +404,8 @@ let of_string_exn deser h =
 
 let of_string deser h =
   try Ok (of_string_exn deser h) with Deser.Error e -> Error e
+
+module Private_ = struct
+  let deser_key (st : Deser.state) = st.key
+  let deser_heap_iter (st : Deser.state) f = Vec.iteri f st.entries
+end

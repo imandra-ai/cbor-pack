@@ -240,3 +240,9 @@ val of_string_exn : 'a Deser.t -> string -> 'a
 (** Parse CBOR and deserialize it *)
 
 val of_string : 'a Deser.t -> string -> 'a Deser.or_error
+
+(** Private utilities, no guarantees of stability *)
+module Private_ : sig
+  val deser_key : Deser.state -> cbor
+  val deser_heap_iter : Deser.state -> (int -> cbor -> unit) -> unit
+end
