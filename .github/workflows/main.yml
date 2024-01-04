@@ -24,10 +24,10 @@ jobs:
           - '5.0.0'
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: imandra-ai/imandra-build-config/actions/slack-send-build-status@master
+    - uses: actions/checkout@v2
+    - uses: ./.github/actions/slack-send-build-status/
       with:
         slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
-    - uses: actions/checkout@v2
     - uses: ocaml/setup-ocaml@v2
       with:
         ocaml-compiler: ${{ matrix.ocaml-compiler }}
