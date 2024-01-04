@@ -25,6 +25,7 @@ jobs:
     - uses: ocaml/setup-ocaml@v2
       with:
         ocaml-compiler: ${{ matrix.ocaml-compiler }}
+        allow-prerelease-opam: true
     - run: opam pin -n .
     - run: opam depext -yt cbor-pack cbor-pack-ppx
     - run: opam install -t . --deps-only
