@@ -1,0 +1,48 @@
+name: 'Send status to Slack #builds'
+description: 'Send status to Slack #builds'
+inputs:
+  slack-webhook-url:
+    description: Webhook URL from slack. You can get this from the org-level secret, secrets.SLACK_WEBHOOK_URL
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - id: 'slack-send-build-status'
+      if: always()
+      uses: 'pyTooling/Actions/with-post-step@v0.4.5'
+      name: 'Send status to Slack #builds'
+      with:
+        main: |
+          echo "gha_start_timestamp=$(date +%s)" >> "$GITHUB_ENV"
+        post: |
+          cat <<EOF > tdiff.sh
+          tdiff() {
+              if ((\$1 < 60)); then
+                  printf '%ds' "\$1"
+              elif ((\$1 < 60*60)); then
+                  printf '%dm' \$((\$1 / 60))
+                  tdiff \$((\$1 % 60))
+              else
+                  printf '%dh' \$((\$1 / (60*60)))
+                  tdiff \$((\$1 % (60*60)))
+              fi
+          }
+
+          tdiff "\$1"
+          EOF
+
+          SHORT_SHA=`echo ${{ github.sha }} | cut -c1-8`
+          now=$(date +%s)
+          duration=`bash tdiff.sh $((now - $gha_start_timestamp))`
+          cat <<EOF > msg.json
+          {
+              "mrkdwn": true,
+              "attachments": [{
+                  "type": "mrkdwn",
+                  "color": "${{ job.status == 'success' && 'good' || 'danger' }}",
+                  "mrkdwn_in": ["text"],
+                  "text": "<https://github.com/${{ github.repository }}|${{ github.repository }}> on <${{ github.event.pull_request.html_url || format('https://github.com/{0}/tree/{1}', github.repository, github.ref_name) }}|\`${{ github.head_ref || github.ref_name }}\`> (<https://github.com/${{ github.repository }}/commit/${{ github.sha }}|\`$SHORT_SHA\`>) finished:\nworkflow <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|${{ github.workflow }} (\`${{job.status}}\`) in \`$duration\`>"
+              }]
+          }
+          EOF
+          curl -s ${{ inputs.slack-webhook-url }} --data @msg.json
