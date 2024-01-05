@@ -163,7 +163,7 @@ let rec dump_c (deser : CP.Deser.state) (indent : int) (out : Buffer.t)
       bpf out "bytes(h'%s')" (hex_of_string b)
   | `Array [] -> bpf out "[]"
   | `Array l ->
-    bpf out "Array [";
+    bpf out "Array(%d) [" (List.length l);
     List.iteri
       (fun i x ->
         if i > 0 then bpf out ",";
@@ -172,7 +172,7 @@ let rec dump_c (deser : CP.Deser.state) (indent : int) (out : Buffer.t)
     bpf out " ]"
   | `Map [] -> bpf out "{}"
   | `Map l ->
-    bpf out "Map {";
+    bpf out "Map(%d) {" (List.length l);
     List.iter
       (fun (x, y) ->
         bpf out "\n%a%a:\n%a%a" add_indent indent
