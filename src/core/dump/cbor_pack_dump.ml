@@ -58,6 +58,7 @@ let rec dump_immediate (c : CP.cbor) : string =
   | `Bytes b -> spf "bytes(…[%d omitted])" (String.length b)
   | `Array l -> spf "[…[%d omitted]]" (List.length l)
   | `Map l -> spf "{…[%d omitted]}" (List.length l)
+  | `Tag (6, `Int i) -> spf "@%d" i
   | `Tag (c, x) -> spf "%d(%s)" c (dump_immediate x)
 
 let dump_bytes_summary b : string =
