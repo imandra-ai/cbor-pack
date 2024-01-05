@@ -1,46 +1,8 @@
 module CP = Cbor_pack
 
-type out = {
-  char: char -> unit;
-  write: bytes -> int -> int -> unit;
-}
-
 let spf = Printf.sprintf
 let fpf = Printf.fprintf
 let bpf = Printf.bprintf
-
-module Buf_ = struct
-  type t = {
-    mutable b: bytes;
-    mutable off: int;
-  }
-
-  let create () : t = { b = Bytes.create 128; off = 0 }
-  let[@inline] cap self = Bytes.length self.b
-  let[@inline] clear self = self.off <- 0
-
-  let[@inline never] ensure_grow_ (self : t) n =
-    assert (cap self < n);
-    let new_b = Bytes.create n in
-    Bytes.blit self.b 0 new_b 0 self.off;
-    self.b <- new_b
-
-  let[@inline] ensure_size_ self n =
-    if self.off + n > cap self then
-      ensure_grow_ self (max (cap self * 2) (self.off + n))
-
-  let[@inline] add_char self c =
-    ensure_size_ self 1;
-    Bytes.set self.b self.off c;
-    self.off <- self.off + 1
-
-  let add_sub_string (self : t) s i len =
-    ensure_size_ self len;
-    Bytes.blit_string s i self.b self.off len;
-    self.off <- self.off + len
-
-  let[@inline] add_string self s = add_sub_string self s 0 (String.length s)
-end
 
 let hex_of_string s =
   let hex_char x =
